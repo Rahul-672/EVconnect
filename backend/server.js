@@ -221,74 +221,121 @@ app.post('/api/stations/:id/stop-charge', (req, res) => {
 });
 
 // Smart Route Optimizer Endpoint (Dynamic from/to highway calculations)
+const CITY_KMS = {
+  'lucknow': 0,
+  'kanpur': 80,
+  'agra': 220,
+  'mathura': 300,
+  'jewar': 420,
+  'noida': 480,
+  'delhi': 500,
+};
+
+const STATION_KMS = {
+  'TP-LKO-01': 5,
+  'CZ-LKO-07': 8,
+  'ST-KNP-02': 80,
+  'CZ-AGR-03': 220,
+  'JB-MTR-04': 300,
+  'TP-JWR-05': 420,
+  'ST-DLH-06': 495,
+};
+
 app.post('/api/route', (req, res) => {
   const { from, to, startSoc } = req.body;
   console.log(`[Routing Engine] Planning route from ${from} to ${to}. Start SOC: ${startSoc}%`);
   
-  const stops = [];
-  const rangeKm = Math.round(437 * startSoc / 100);
-  const f = (from || 'lucknow').toLowerCase();
-  const t = (to || 'delhi').toLowerCase();
+  const f = (from || '').toLowerCase();
+  const t = (to || '').toLowerCase();
 
-  // If start is Lucknow
-  if (f.includes('lucknow')) {
-    if (rangeKm < 150) {
-      const kanpur = mockDB.stations.find(s => s.id === 'ST-KNP-02');
-      if (kanpur) {
-        stops.push({
-          ...kanpur,
-          distKm: 80,
-          chargeMins: 18,
-          reason: 'Low SOC — recharge needed'
-        });
-      }
-    }
-    // If ending in Noida or Delhi or Jewar
-    if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
-      const jewar = mockDB.stations.find(s => s.id === 'TP-JWR-05');
-      if (jewar) {
-        stops.push({
-          ...jewar,
-          distKm: 400,
-          chargeMins: 20,
-          reason: 'Top-up before destination'
-        });
-      }
-    }
-  } 
-  // If start is Kanpur
-  else if (f.includes('kanpur')) {
-    if (t.includes('delhi') || t.includes('noida') || t.includes('jewar') || t.includes('mathura')) {
-      const mathura = mockDB.stations.find(s => s.id === 'JB-MTR-04');
-      if (mathura) {
-        stops.push({
-          ...mathura,
-          distKm: 280,
-          chargeMins: 15,
-          reason: 'Midway top-up'
-        });
-      }
-    }
+  let startKm = 0;
+  let endKm = 500;
+  
+  for (const [name, km] of Object.entries(CITY_KMS)) {
+    if (f.includes(name)) startKm = km;
+    if (t.includes(name)) endKm = km;
   }
-  // If start is Agra
-  else if (f.includes('agra')) {
-    if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
-      const jewar = mockDB.stations.find(s => s.id === 'TP-JWR-05');
-      if (jewar) {
-        stops.push({
-          ...jewar,
-          distKm: 180,
-          chargeMins: 15,
-          reason: 'Top-up before Noida/Delhi border'
-        });
+
+  const direction = startKm <= endKm ? 1 : -1;
+  const totalDistance = Math.abs(endKm - startKm);
+  
+  const stationsAlongRoute = mockDB.stations
+    .map(s => ({
+      ...s,
+      km: STATION_KMS[s.id] || 0
+    }))
+    .filter(s => {
+      if (direction === 1) {
+        return s.km > startKm && s.km < endKm;
+      } else {
+        return s.km < startKm && s.km > endKm;
+      }
+    });
+
+  stationsAlongRoute.sort((a, b) => (a.km - b.km) * direction);
+
+  const suggestedStops = [];
+  let currentKm = startKm;
+  let currentSoc = parseFloat(startSoc) || 32;
+  const maxRange = 437; 
+  
+  let attempts = 0;
+  while (attempts < 10) {
+    attempts++;
+    const remainingRange = maxRange * (currentSoc / 100);
+    const distanceToDest = Math.abs(endKm - currentKm);
+    
+    const rangeNeededToDest = distanceToDest + (maxRange * 0.1);
+    if (remainingRange >= rangeNeededToDest || remainingRange >= distanceToDest) {
+      break;
+    }
+
+    let bestStation = null;
+    for (const station of stationsAlongRoute) {
+      if (suggestedStops.some(s => s.id === station.id)) continue;
+      const distFromCurrent = Math.abs(station.km - currentKm);
+      if (distFromCurrent <= remainingRange - (maxRange * 0.05)) {
+        bestStation = station;
       }
     }
+
+    if (!bestStation) {
+      for (const station of stationsAlongRoute) {
+        if (suggestedStops.some(s => s.id === station.id)) continue;
+        const distFromCurrent = Math.abs(station.km - currentKm);
+        if (distFromCurrent <= remainingRange) {
+          bestStation = station;
+          break;
+        }
+      }
+    }
+
+    if (!bestStation) break;
+
+    const distToStation = Math.abs(bestStation.km - currentKm);
+    const socAtStation = Math.round(currentSoc - (distToStation / maxRange * 100));
+    const targetSoc = 80;
+    const socNeeded = targetSoc - socAtStation;
+    const kwhNeeded = (socNeeded / 100) * 40.5;
+    const chargeHours = kwhNeeded / bestStation.power;
+    const chargeMins = Math.max(10, Math.round(chargeHours * 60));
+
+    suggestedStops.push({
+      ...bestStation,
+      distKm: distToStation,
+      arrivalSoc: Math.max(5, socAtStation),
+      chargeMins,
+      reason: socAtStation < 20 ? 'Battery critical — recharge required' : 'Midway top-up for optimal range'
+    });
+
+    currentKm = bestStation.km;
+    currentSoc = targetSoc;
   }
 
   res.json({
     route: `${from} - ${to} Expressway Corridor`,
-    totalDistanceKm: f.includes('lucknow') && t.includes('delhi') ? 550 : f.includes('agra') ? 220 : 350,
-    suggestedStops: stops
+    totalDistanceKm: totalDistance,
+    suggestedStops
   });
 });
 

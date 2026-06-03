@@ -32,6 +32,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isNetworkOnline, setIsNetworkOnline] = useState(true);
   const [chargingSession, setChargingSession] = useState(null);
+  const [plannedRoutePath, setPlannedRoutePath] = useState([]);
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -262,10 +263,14 @@ export default function App() {
   const co2Total = (85.4 + transactions.reduce((a, t) => a + (typeof t.kwh === 'number' ? t.kwh : 0) * 0.71, 0)).toFixed(1);
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-[#06080f] text-slate-200">
+    <div className={`h-screen w-screen flex overflow-hidden transition-colors duration-300 ${
+      theme === 'light' ? 'bg-[#f8fafc] text-slate-900 light-theme' : 'bg-[#06080f] text-slate-200'
+    }`}>
 
       {/* ─── Sidebar ─── */}
-      <aside className={`shrink-0 flex flex-col border-r border-white/[.05] bg-[#080c17]/80 backdrop-blur-xl transition-all duration-300 z-50 ${
+      <aside className={`shrink-0 flex flex-col border-r border-white/[.05] transition-all duration-300 z-50 ${
+        theme === 'light' ? 'bg-white/80' : 'bg-[#080c17]/80'
+      } backdrop-blur-xl ${
         sidebarOpen ? 'w-56' : 'w-16'
       }`}>
         {/* Logo */}
@@ -331,7 +336,7 @@ export default function App() {
             {/* Pill Theme Toggle */}
             <div className="flex bg-white/[.04] border border-white/[.07] rounded-xl p-1 gap-1">
               <button
-                onClick={() => { if (theme === 'light') toggleTheme(); }}
+                onClick={() => { if (theme === 'dark') toggleTheme(); }}
                 className={`flex-1 flex items-center justify-center py-1.5 rounded-lg transition-colors cursor-pointer ${
                   theme === 'light' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/15' : 'text-slate-500 hover:text-slate-300'
                 }`}
@@ -339,7 +344,7 @@ export default function App() {
                 <Sun className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => { if (theme === 'dark') toggleTheme(); }}
+                onClick={() => { if (theme === 'light') toggleTheme(); }}
                 className={`flex-1 flex items-center justify-center py-1.5 rounded-lg transition-colors cursor-pointer ${
                   theme === 'dark' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/15' : 'text-slate-500 hover:text-slate-300'
                 }`}
@@ -363,7 +368,9 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top Bar */}
-        <header className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-white/[.05] bg-[#080c17]/60 backdrop-blur-xl z-40">
+        <header className={`h-14 shrink-0 flex items-center justify-between px-5 border-b border-white/[.05] ${
+          theme === 'light' ? 'bg-white/60' : 'bg-[#080c17]/60'
+        } backdrop-blur-xl z-40`}>
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-bold text-white">
               {TABS.find(t => t.id === activeTab)?.label}
@@ -443,6 +450,7 @@ export default function App() {
                   onSelectStation={setSelectedStation}
                   routeActive={routeActive}
                   theme={theme}
+                  routePath={plannedRoutePath}
                 />
               </div>
 
@@ -470,19 +478,21 @@ export default function App() {
                 <RoutePlanner
                   stations={stations}
                   routeActive={routeActive}
-                  onPlanRoute={() => setRouteActive(true)}
-                  onClearRoute={() => setRouteActive(false)}
+                  onPlanRoute={(path) => { setPlannedRoutePath(path); setRouteActive(true); }}
+                  onClearRoute={() => { setPlannedRoutePath([]); setRouteActive(false); }}
+                  onRouteUpdate={(path) => { if (routeActive) setPlannedRoutePath(path); }}
                   onStartCharge={onStartCharge}
                 />
               </div>
               <div className="flex-1 h-full relative">
                 <LiveMap
                   mapId="route-map"
-                  stations={stations}
+                  stations={mapStations}
                   selectedStation={selectedStation}
                   onSelectStation={setSelectedStation}
                   routeActive={routeActive}
                   theme={theme}
+                  routePath={plannedRoutePath}
                 />
               </div>
             </div>

@@ -8,7 +8,7 @@ const STATUS_COLORS = {
   offline:   '#64748b',
 };
 
-export default function LiveMap({ stations, selectedStation, onSelectStation, routeActive, mapId = 'main', theme = 'dark' }) {
+export default function LiveMap({ stations, selectedStation, onSelectStation, routeActive, mapId = 'main', theme = 'dark', routePath = ROUTE_PATH }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(null);
@@ -132,6 +132,15 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
     });
   }, [stations, selectedStation, onSelectStation]);
 
+  // Fly to selected station
+  useEffect(() => {
+    if (!mapRef.current || !selectedStation) return;
+    mapRef.current.setView([selectedStation.lat, selectedStation.lng], 12, {
+      animate: true,
+      duration: 1.0
+    });
+  }, [selectedStation]);
+
   // Route polyline drawing and fitting bounds
   useEffect(() => {
     if (!mapRef.current) return;
@@ -142,10 +151,10 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
       routeLineRef.current = null;
     }
 
-    if (routeActive) {
+    if (routeActive && routePath && routePath.length > 0) {
       mapRef.current.invalidateSize();
 
-      routeLineRef.current = L.polyline(ROUTE_PATH, {
+      routeLineRef.current = L.polyline(routePath, {
         color: '#38bdf8',
         weight: 3.5,
         opacity: .75,
@@ -161,7 +170,7 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
         }
       }, 150);
     }
-  }, [routeActive]);
+  }, [routeActive, routePath]);
 
   return <div ref={containerRef} className="w-full h-full rounded-2xl overflow-hidden min-h-[400px]" style={{ minHeight: '100%' }} />;
 }
