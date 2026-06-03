@@ -23,6 +23,22 @@ const TABS = [
 export default function App() {
   const [theme, setTheme] = useState('dark');
   const [stations, setStations] = useState(STATIONS);
+
+  const isIndiaStation = (st) => {
+    // Rough bounding box for India (lat 8-37, lng 68-97)
+    return st.lat >= 8 && st.lat <= 37 && st.lng >= 68 && st.lng <= 97;
+  };
+
+  const indiaStations = stations.filter(isIndiaStation);
+
+  // Handler to cancel a reservation
+  const handleCancelReservation = useCallback((station) => {
+    // Update station status back to available and clear wait time
+    setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'available', waitMin: 0 } : s));
+  }, []);
+
+  // Pass filtered stations to components
+  const stationsProp = indiaStations;
   const [activeTab, setActiveTab] = useState('map');
   const [selectedStation, setSelectedStation] = useState(null);
   const [routeActive, setRouteActive] = useState(false);
@@ -33,6 +49,7 @@ export default function App() {
   const [isNetworkOnline, setIsNetworkOnline] = useState(true);
   const [chargingSession, setChargingSession] = useState(null);
   const [plannedRoutePath, setPlannedRoutePath] = useState([]);
+  const [userSoc, setUserSoc] = useState(72);
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -112,7 +129,7 @@ export default function App() {
         operator: station.operator,
         power: station.power,
         price: station.price,
-        startSoc: 32,
+        startSoc: userSoc,
         isOffline: true,
       });
       setStations(prev => prev.map(s =>
@@ -127,7 +144,7 @@ export default function App() {
       const response = await fetch(`http://localhost:8085/api/stations/${station.id}/start-charge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isOffline: false })
+        body: JSON.stringify({ isOffline: false, startSoc: userSoc })
       });
       if (!response.ok) throw new Error('API error');
       const data = await response.json();
@@ -142,7 +159,7 @@ export default function App() {
         operator: station.operator,
         power: station.power,
         price: station.price,
-        startSoc: 32,
+        startSoc: userSoc,
         isOffline: true,
       });
       setStations(prev => prev.map(s =>
@@ -151,12 +168,15 @@ export default function App() {
       setSelectedStation(null);
       setActiveTab('map');
     }
-  }, [isNetworkOnline, balance]);
+  }, [isNetworkOnline, balance, userSoc]);
 
   // ── Stop Charging ──
   const onStopCharge = useCallback(async ({ cost, kwh, soc }) => {
     if (!chargingSession) return;
     const finalCost = Math.round(cost * 100) / 100;
+    
+    // Update global vehicle battery status
+    setUserSoc(soc);
 
     if (chargingSession.isOffline || !isNetworkOnline) {
       // Local sync simulation
@@ -248,14 +268,15 @@ export default function App() {
       if (!response.ok) throw new Error('Failed to top up');
     } catch (error) {
       console.warn('⚠️ Wallet topup endpoint offline, fallback to local');
-      setBalance(b => b + amt);
+        setBalance(b => b + amt);
     }
   }, [isNetworkOnline]);
 
   // Filtered stations for map tab
-  const mapStations = stations.filter(s => {
+  const mapStations = indiaStations.filter(s => {
     if (filterOp !== 'all' && s.operator !== filterOp) return false;
     if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    // Show only stations in India (already filtered in indiaStations)
     return true;
   });
 
@@ -482,6 +503,7 @@ export default function App() {
                   onClearRoute={() => { setPlannedRoutePath([]); setRouteActive(false); }}
                   onRouteUpdate={(path) => { if (routeActive) setPlannedRoutePath(path); }}
                   onStartCharge={onStartCharge}
+                  userSoc={userSoc}
                 />
               </div>
               <div className="flex-1 h-full relative">
@@ -535,7 +557,7 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {stations.map(st => {
+                  {stationsProp.map(st => {
                     const op = OPERATORS.find(o => o.id === st.operator);
                     const isOccupied = st.status === 'occupied';
                     const isOffline = st.status === 'offline';
@@ -603,14 +625,19 @@ export default function App() {
                               🔒 Occupied — wait {st.waitMin}m
                             </div>
                           )}
-                          {st.status === 'reserved' && (
-                            <div className="flex-1 py-2 text-center rounded-xl text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/15">
-                              🕒 Reserved Slot
-                            </div>
-                          )}
+                           {st.status === 'reserved' && (
+                             <div className="flex items-center gap-2">
+                               <div className="flex-1 py-2 text-center rounded-xl text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/15">
+                                 🕒 Reserved — next slot in {st.waitMin} min
+                               </div>
+                               <button onClick={() => handleCancelReservation(st)} className="h-9 px-3 rounded-xl text-xs font-semibold glass border-white/10 text-amber-400 hover:bg-white/[.06] transition-colors cursor-pointer">
+                                 Cancel
+                               </button>
+                             </div>
+                           )}
                           {st.status === 'offline' && (
                             <button onClick={() => onStartCharge(st)} className="flex-1 h-9 rounded-xl text-xs font-semibold bg-amber-500/15 border border-amber-500/25 text-amber-400 hover:bg-amber-500/25 transition-colors cursor-pointer">
-                              Edge Offline Charge
+                                Edge Offline Charge
                             </button>
                           )}
                         </div>
@@ -626,7 +653,7 @@ export default function App() {
           {activeTab === 'ai' && (
             <div className="flex-1 overflow-y-auto">
               <div className="max-w-5xl mx-auto p-6 w-full">
-                <AIChatbot balance={balance} co2Total={parseFloat(co2Total)} />
+                <AIChatbot balance={balance} co2Total={parseFloat(co2Total)} userSoc={userSoc} />
               </div>
             </div>
           )}
@@ -635,7 +662,7 @@ export default function App() {
 
         {/* Global Charging session overlay */}
         {chargingSession && (
-          <div className="absolute inset-0 z-[1300] bg-[#06080f]/95 backdrop-blur-sm flex items-center justify-center">
+          <div className={`absolute inset-0 z-[1300] backdrop-blur-sm flex items-center justify-center ${theme === 'light' ? 'bg-[#f8fafc]/95' : 'bg-[#06080f]/95'}`}>
             <div className="w-full max-w-lg">
               <ChargingSession session={chargingSession} onStop={onStopCharge} />
             </div>
@@ -649,6 +676,7 @@ export default function App() {
             onClose={() => setSelectedStation(null)}
             onStartCharge={onStartCharge}
             onReserve={onReserve}
+            onCancelReservation={handleCancelReservation}
             isCharging={!!chargingSession}
           />
         )}

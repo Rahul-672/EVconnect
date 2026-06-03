@@ -10,7 +10,7 @@ const SUGGESTIONS = [
   { text: 'How do I pay across networks?', icon: CreditCard, color: 'text-emerald-400', bg: 'bg-emerald-500/[.06] border-emerald-500/15' },
 ];
 
-export default function AIChatbot({ balance = 1250, co2Total = 85.4 }) {
+export default function AIChatbot({ balance = 1250, co2Total = 85.4, userSoc = 72 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -33,7 +33,7 @@ export default function AIChatbot({ balance = 1250, co2Total = 85.4 }) {
       let reply;
       if (lower.includes('reach') || lower.includes('range') || lower.includes('battery') || lower.includes('noida')) {
         const socMatch = lower.match(/(\d+)%?/);
-        const soc = socMatch ? parseInt(socMatch[1]) : 30;
+        const soc = socMatch ? parseInt(socMatch[1]) : userSoc;
         reply = AI_RESPONSES.range(soc, 'Noida');
       } else if (lower.includes('cheap') || lower.includes('cost') || lower.includes('price')) {
         reply = AI_RESPONSES.cheapest;
@@ -88,7 +88,7 @@ export default function AIChatbot({ balance = 1250, co2Total = 85.4 }) {
         
         {/* Banner image layout right side */}
         <div className="absolute right-0 top-0 bottom-0 w-[45%] overflow-hidden pointer-events-none hidden md:block">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0d1326] via-[#0d1326]/40 to-transparent z-10" />
+          <div className="absolute inset-0 banner-gradient z-10" />
           <img src={evBanner} alt="EV Charging" className="w-full h-full object-cover object-center opacity-85" />
         </div>
       </div>
@@ -168,7 +168,7 @@ export default function AIChatbot({ balance = 1250, co2Total = 85.4 }) {
                 <div className="absolute inset-0 bg-sky-500/5 blur-sm" />
                 {/* Energy liquid fill */}
                 <div className="w-full rounded-xl bg-gradient-to-t from-emerald-500 via-emerald-400 to-emerald-300 shadow-[0_-4px_16px_rgba(52,211,153,0.5)] transition-all duration-1000"
-                  style={{ height: '72%' }}
+                  style={{ height: `${userSoc}%` }}
                 />
               </div>
             </div>
@@ -185,13 +185,13 @@ export default function AIChatbot({ balance = 1250, co2Total = 85.4 }) {
                   <span className="text-[10px] text-slate-500 font-semibold">Est. Range</span>
                 </div>
                 <div className="flex justify-between items-baseline mb-2">
-                  <span className="text-xl font-black font-display text-white">72%</span>
-                  <span className="text-sm font-extrabold font-display text-slate-200">218 km</span>
+                  <span className="text-xl font-black font-display text-white">{userSoc}%</span>
+                  <span className="text-sm font-extrabold font-display text-slate-200">{Math.round(437 * userSoc / 100)} km</span>
                 </div>
 
                 {/* Range progress bar */}
                 <div className="w-full h-1.5 rounded-full bg-white/[.05] overflow-hidden mb-4">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: '72%' }} />
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${userSoc}%` }} />
                 </div>
 
                 <div className="space-y-2.5">
