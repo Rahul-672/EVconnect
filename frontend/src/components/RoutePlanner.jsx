@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Route, Zap, Navigation, Battery, Search, MapPin } from 'lucide-react';
 
 const CITIES = [
@@ -25,55 +25,55 @@ export default function RoutePlanner({ stations, onPlanRoute, onClearRoute, rout
   const fromSuggestions = CITIES.filter(c => c.toLowerCase().includes(fromQuery.toLowerCase()));
   const toSuggestions = CITIES.filter(c => c.toLowerCase().includes(toQuery.toLowerCase()));
 
-  const plan = async () => {
-    try {
-      const response = await fetch('http://localhost:8085/api/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: fromQuery,
-          to: toQuery,
-          startSoc: soc
-        })
-      });
-      if (!response.ok) throw new Error('API error');
-      const data = await response.json();
-      setStops(data.suggestedStops);
-      onPlanRoute();
-    } catch (error) {
-      console.warn('⚠️ Route optimization API offline, using local heuristics fallback');
-      const rangeKm = Math.round(437 * soc / 100);
-      const neededStops = [];
+  // ── Auto-recalculate Stops on SOC or City inputs change ──
+  useEffect(() => {
+    const runPlan = async () => {
+      try {
+        const response = await fetch('http://localhost:8085/api/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: fromQuery,
+            to: toQuery,
+            startSoc: soc
+          })
+        });
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        setStops(data.suggestedStops);
+      } catch (error) {
+        console.warn('⚠️ Route optimization API offline, using local heuristics fallback');
+        const rangeKm = Math.round(437 * soc / 100);
+        const neededStops = [];
+        const f = fromQuery.toLowerCase();
+        const t = toQuery.toLowerCase();
 
-      // Fallback heuristics matching selected routes
-      const f = fromQuery.toLowerCase();
-      const t = toQuery.toLowerCase();
-
-      if (f.includes('lucknow')) {
-        if (rangeKm < 150) {
-          const kanpur = stations.find(s => s.id === 'ST-KNP-02');
-          if (kanpur) neededStops.push({ ...kanpur, distKm: 80, chargeMins: 18, reason: 'Low SOC — recharge needed' });
+        if (f.includes('lucknow')) {
+          if (rangeKm < 150) {
+            const kanpur = stations.find(s => s.id === 'ST-KNP-02');
+            if (kanpur) neededStops.push({ ...kanpur, distKm: 80, chargeMins: 18, reason: 'Low SOC — recharge needed' });
+          }
+          if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
+            const jewar = stations.find(s => s.id === 'TP-JWR-05');
+            if (jewar) neededStops.push({ ...jewar, distKm: 400, chargeMins: 20, reason: 'Top-up before destination' });
+          }
+        } else if (f.includes('kanpur')) {
+          if (t.includes('delhi') || t.includes('noida') || t.includes('jewar') || t.includes('mathura')) {
+            const mathura = stations.find(s => s.id === 'JB-MTR-04');
+            if (mathura) neededStops.push({ ...mathura, distKm: 280, chargeMins: 15, reason: 'Midway top-up' });
+          }
+        } else if (f.includes('agra')) {
+          if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
+            const jewar = stations.find(s => s.id === 'TP-JWR-05');
+            if (jewar) neededStops.push({ ...jewar, distKm: 180, chargeMins: 15, reason: 'Top-up before border' });
+          }
         }
-        if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
-          const jewar = stations.find(s => s.id === 'TP-JWR-05');
-          if (jewar) neededStops.push({ ...jewar, distKm: 400, chargeMins: 20, reason: 'Top-up before destination' });
-        }
-      } else if (f.includes('agra')) {
-        if (t.includes('delhi') || t.includes('noida') || t.includes('jewar')) {
-          const jewar = stations.find(s => s.id === 'TP-JWR-05');
-          if (jewar) neededStops.push({ ...jewar, distKm: 180, chargeMins: 15, reason: 'Top-up before Noida/Delhi border' });
-        }
+        setStops(neededStops);
       }
+    };
 
-      setStops(neededStops);
-      onPlanRoute();
-    }
-  };
-
-  const clear = () => {
-    setStops([]);
-    onClearRoute();
-  };
+    runPlan();
+  }, [fromQuery, toQuery, soc, stations]);
 
   return (
     <div className="glass-highlight rounded-2xl p-5 animate-fade-in relative">
@@ -170,12 +170,12 @@ export default function RoutePlanner({ stations, onPlanRoute, onClearRoute, rout
 
       {/* Actions */}
       {!routeActive ? (
-        <button onClick={plan} className="w-full h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/30 transition-all active:scale-[.98]">
-          <Navigation className="w-4 h-4" /> Calculate Route
+        <button onClick={onPlanRoute} className="w-full h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/30 transition-all active:scale-[.98]">
+          <Navigation className="w-4 h-4" /> Show Route on Map
         </button>
       ) : (
-        <button onClick={clear} className="w-full h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-white/[.06] border border-white/10 text-slate-300 hover:bg-white/[.1] transition-all">
-          Clear Route
+        <button onClick={onClearRoute} className="w-full h-10 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-white/[.06] border border-white/10 text-slate-300 hover:bg-white/[.1] transition-all">
+          Hide Route from Map
         </button>
       )}
 
@@ -208,7 +208,7 @@ export default function RoutePlanner({ stations, onPlanRoute, onClearRoute, rout
                     </div>
                     <button
                       onClick={() => onStartCharge(stop)}
-                      className="text-[10px] font-semibold bg-sky-500/15 border border-sky-500/25 text-sky-400 px-2.5 py-1 rounded-lg hover:bg-sky-500/25 transition-colors"
+                      className="text-[10px] font-semibold bg-sky-500/15 border border-sky-500/25 text-sky-400 px-2.5 py-1 rounded-lg hover:bg-sky-500/25 transition-colors cursor-pointer"
                     >
                       Charge
                     </button>

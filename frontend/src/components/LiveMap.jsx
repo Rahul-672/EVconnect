@@ -8,7 +8,7 @@ const STATUS_COLORS = {
   offline:   '#64748b',
 };
 
-export default function LiveMap({ stations, selectedStation, onSelectStation, routeActive, mapId = 'main' }) {
+export default function LiveMap({ stations, selectedStation, onSelectStation, routeActive, mapId = 'main', theme = 'dark' }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(null);
@@ -30,7 +30,12 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
     }).setView([27.4, 79.2], 7);
 
     window.L.control.zoom({ position: 'bottomright' }).addTo(map);
-    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+
+    const initialUrl = theme === 'light'
+      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+    window.L.tileLayer(initialUrl, {
       maxZoom: 18,
     }).addTo(map);
 
@@ -49,6 +54,27 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
       routeLineRef.current = null;
     };
   }, [mapId]);
+
+  // Swaps tileLayer dynamically when theme shifts
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove any previous tile layers
+    map.eachLayer(layer => {
+      if (layer instanceof window.L.TileLayer) {
+        map.removeLayer(layer);
+      }
+    });
+
+    const tileUrl = theme === 'light'
+      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+    window.L.tileLayer(tileUrl, {
+      maxZoom: 18,
+    }).addTo(map);
+  }, [theme]);
 
   // ResizeObserver to handle tab changes, sidebars, transitions, and window sizing
   useEffect(() => {

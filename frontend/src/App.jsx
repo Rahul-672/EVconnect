@@ -21,6 +21,7 @@ const TABS = [
 ];
 
 export default function App() {
+  const [theme, setTheme] = useState('dark');
   const [stations, setStations] = useState(STATIONS);
   const [activeTab, setActiveTab] = useState('map');
   const [selectedStation, setSelectedStation] = useState(null);
@@ -31,6 +32,16 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isNetworkOnline, setIsNetworkOnline] = useState(true);
   const [chargingSession, setChargingSession] = useState(null);
+
+  const toggleTheme = useCallback(() => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    if (nextTheme === 'light') {
+      document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+    }
+  }, [theme]);
   const [transactions, setTransactions] = useState([
     { op: 'Statiq', station: 'Kanpur NH19', kwh: 38.2, cost: 802.20, time: '2 hours ago', type: 'Roaming' },
     { op: 'Tata Power', station: 'Hazratganj', kwh: 26.4, cost: 488.40, time: 'Yesterday', type: 'Direct' },
@@ -319,10 +330,20 @@ export default function App() {
 
             {/* Pill Theme Toggle */}
             <div className="flex bg-white/[.04] border border-white/[.07] rounded-xl p-1 gap-1">
-              <button className="flex-1 flex items-center justify-center py-1.5 rounded-lg text-slate-400 hover:text-white transition-colors">
+              <button
+                onClick={() => { if (theme === 'light') toggleTheme(); }}
+                className={`flex-1 flex items-center justify-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  theme === 'light' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/15' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
                 <Sun className="w-3.5 h-3.5" />
               </button>
-              <button className="flex-1 flex items-center justify-center py-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/15 transition-colors">
+              <button
+                onClick={() => { if (theme === 'dark') toggleTheme(); }}
+                className={`flex-1 flex items-center justify-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  theme === 'dark' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/15' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
                 <Moon className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -421,6 +442,7 @@ export default function App() {
                   selectedStation={selectedStation}
                   onSelectStation={setSelectedStation}
                   routeActive={routeActive}
+                  theme={theme}
                 />
               </div>
 
@@ -460,6 +482,7 @@ export default function App() {
                   selectedStation={selectedStation}
                   onSelectStation={setSelectedStation}
                   routeActive={routeActive}
+                  theme={theme}
                 />
               </div>
             </div>
