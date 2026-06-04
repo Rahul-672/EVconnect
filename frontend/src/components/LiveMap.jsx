@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { ROUTE_PATH } from '../data/mockData';
 
 const STATUS_COLORS = {
   available: '#34d399',
@@ -8,7 +7,7 @@ const STATUS_COLORS = {
   offline:   '#64748b',
 };
 
-export default function LiveMap({ stations, selectedStation, onSelectStation, routeActive, mapId = 'main', theme = 'dark', routePath = ROUTE_PATH }) {
+export default function LiveMap({ stations = [], selectedStation, onSelectStation, routeActive, mapId = 'main', theme = 'dark', routePath = [] }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(null);
@@ -123,7 +122,8 @@ export default function LiveMap({ stations, selectedStation, onSelectStation, ro
 
       marker.bindTooltip(
         `<div class="tooltip-title" style="font-size:11px;font-weight:600;">${st.name}</div>
-         <div class="tooltip-desc" style="font-size:10px;">${st.power} kW • ₹${st.price}/kWh • ${st.status.toUpperCase()}</div>`,
+         <div class="tooltip-desc" style="font-size:10px;">${st.power} kW • ₹${st.price}/kWh • ${st.status.toUpperCase()}</div>
+         <div style="font-size:10px; color:#38bdf8; margin-top:4px; font-weight:bold; text-align:center;">🖱️ Click the dot for full details</div>`,
         {
           direction: 'top',
           offset: [0, -size/2 - 4],

@@ -16,7 +16,7 @@ export default function StationPanel({ station, onClose, onStartCharge, onReserv
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1200] animate-slide-up">
-      <div className="glass rounded-t-3xl p-4 md:p-6 max-h-[80vh] md:max-h-[75vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,.5)]">
+      <div className="bg-slate-950 border-t border-white/10 rounded-t-3xl p-4 md:p-6 max-h-[80vh] md:max-h-[75vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,.5)]">
         {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div className="flex-1 min-w-0">

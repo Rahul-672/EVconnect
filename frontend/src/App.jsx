@@ -83,7 +83,6 @@ export default function App() {
     setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'available', waitMin: 0 } : s));
   }, []);
 
-  const stationsProp = indiaStations;
   const [activeTab, setActiveTab] = useState('map');
   const [selectedStation, setSelectedStation] = useState(null);
   const [routeActive, setRouteActive] = useState(false);
@@ -96,6 +95,15 @@ export default function App() {
   const [plannedRoutePath, setPlannedRoutePath] = useState([]);
   const [userSoc, setUserSoc] = useState(72);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Route planner state — lifted here so it persists across tab switches
+  const [routeFromQuery, setRouteFromQuery] = useState('');
+  const [routeToQuery, setRouteToQuery] = useState('');
+  const [routeFromCoords, setRouteFromCoords] = useState(null);
+  const [routeToCoords, setRouteToCoords] = useState(null);
+  const [routeStations, setRouteStations] = useState([]);
+
+  const stationsProp = routeActive && routeStations.length > 0 ? routeStations : stations;
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -259,7 +267,7 @@ export default function App() {
     setPlannedRoutePath(path);
   }, []);
 
-  const mapStations = indiaStations.filter(s => {
+  const mapStations = stationsProp.filter(s => {
     if (filterOp !== 'all' && s.operator !== filterOp) return false;
     if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
@@ -338,16 +346,23 @@ export default function App() {
           <div className="p-4 border-t border-white/[.05] space-y-3.5 animate-fade-in text-[11px]">
             <div>
               <div className="text-slate-500 uppercase tracking-widest text-[9px] font-bold">Network Status</div>
-              <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-blink" />
-                All Systems Operational
+              <div className={`flex items-center gap-1.5 font-semibold ${routeActive ? 'text-emerald-400' : 'text-slate-400'} mt-1`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${routeActive ? 'bg-emerald-400 animate-blink' : 'bg-slate-500'}`} />
+                {routeActive ? 'Route Systems Operational' : 'Awaiting Route Data'}
               </div>
             </div>
 
             <div className="flex items-center justify-between">
               <span className="text-slate-500 font-medium">Online Status</span>
               <span className="text-slate-300 font-bold">
-                {isNetworkOnline ? `${onlineCount}/${stations.length} Online` : 'Offline'}
+                {isNetworkOnline ? (routeActive ? `${routeStations.filter(s => s.status !== 'offline').length}/${routeStations.length} Online` : '--/-- Online') : 'Offline'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">Available Now</span>
+              <span className="text-emerald-400 font-bold">
+                {routeActive ? `${routeStations.filter(s => s.status === 'available').length} Stations` : '--'}
               </span>
             </div>
 
@@ -395,7 +410,7 @@ export default function App() {
       </aside>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0 relative">
 
         {/* Top Bar */}
         <header className={`h-14 shrink-0 flex items-center justify-between px-3 md:px-5 border-b border-white/[.05] ${
@@ -532,8 +547,8 @@ export default function App() {
                 />
               </div>
 
-              {/* Map Legend — hidden on very small screens */}
-              <div className="hidden sm:block absolute bottom-5 right-5 z-[1100] glass rounded-xl px-3 md:px-4 py-2 md:py-3 text-[10px] space-y-1.5">
+              {/* Map Legend */}
+              <div className="absolute top-[90px] md:top-4 right-3 md:right-4 z-[1100] glass rounded-xl px-2.5 md:px-4 py-2 md:py-3 text-[9px] md:text-[10px] space-y-1.5 shadow-lg">
                 {[
                   { color: '#34d399', label: 'Available' },
                   { color: '#fb7185', label: 'Occupied' },
@@ -541,7 +556,7 @@ export default function App() {
                   { color: '#64748b', label: 'Offline' },
                 ].map(({ color, label }) => (
                   <div key={label} className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}60` }} />
+                    <span className="w-2 md:w-2.5 h-2 md:h-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}60` }} />
                     <span className="text-slate-400">{label}</span>
                   </div>
                 ))}
@@ -562,15 +577,28 @@ export default function App() {
                   onRouteUpdate={onRouteUpdate}
                   onStartCharge={onStartCharge}
                   userSoc={userSoc}
+                  onSocChange={setUserSoc}
+                  fromQuery={routeFromQuery}
+                  toQuery={routeToQuery}
+                  fromCoords={routeFromCoords}
+                  toCoords={routeToCoords}
+                  onFromQueryChange={setRouteFromQuery}
+                  onToQueryChange={setRouteToQuery}
+                  onFromCoordsChange={setRouteFromCoords}
+                  onToCoordsChange={setRouteToCoords}
+                  onStopsComputed={setRouteStations}
                 />
               </div>
               {/* Map */}
               <div className="flex-1 min-h-[280px] relative">
                 <LiveMap
                   mapId="route-map"
-                  stations={mapStations}
+                  stations={routeStations}
                   selectedStation={selectedStation}
-                  onSelectStation={setSelectedStation}
+                  onSelectStation={(st) => {
+                    setSelectedStation(st);
+                    setActiveTab('stations');
+                  }}
                   routeActive={routeActive}
                   theme={theme}
                   routePath={plannedRoutePath}
@@ -595,26 +623,43 @@ export default function App() {
           {/* ── STATIONS TAB ── */}
           {activeTab === 'stations' && (
             <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
-              <div className="max-w-5xl mx-auto space-y-5 w-full">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                  <div>
-                    <h3 className="text-base md:text-lg font-bold text-white">Centralized Charging Hub</h3>
-                    <p className="text-xs text-slate-400 mt-1">Real-time status updates, sensor diagnostics, and reservation options.</p>
+              {!routeActive ? (
+                <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto space-y-4 animate-fade-in mt-20">
+                  <div className="w-16 h-16 bg-sky-500/10 rounded-full flex items-center justify-center border border-sky-500/20 mb-2">
+                    <Navigation className="w-8 h-8 text-sky-400" />
                   </div>
-                  <div className="flex gap-3 shrink-0">
-                    <div className="glass border-white/[.05] rounded-xl px-3 md:px-4 py-2 text-center">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">India Stations</div>
-                      <div className="text-sm font-extrabold text-white mt-0.5">{stationsProp.length}</div>
-                    </div>
-                    <div className="glass border-white/[.05] rounded-xl px-3 md:px-4 py-2 text-center">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">Uptime Avg</div>
-                      <div className="text-sm font-extrabold text-emerald-400 mt-0.5">97.8%</div>
-                    </div>
-                  </div>
+                  <h3 className="text-xl font-bold text-white">Route Directory</h3>
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    This directory dynamically generates based on your journey. Please plan a route first to unlock a personalized list of all EV charging stations along your specific path.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('route')}
+                    className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    Go to Route Planner
+                  </button>
                 </div>
+              ) : (
+                <div className="max-w-5xl mx-auto space-y-5 w-full">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <div>
+                      <h3 className="text-base md:text-lg font-bold text-white">Centralized Charging Hub</h3>
+                      <p className="text-xs text-slate-400 mt-1">Real-time status updates, sensor diagnostics, and reservation options.</p>
+                    </div>
+                    <div className="flex gap-3 shrink-0">
+                      <div className="glass border-white/[.05] rounded-xl px-3 md:px-4 py-2 text-center">
+                        <div className="text-[10px] text-slate-500 uppercase font-bold">{routeActive ? 'Route Stations' : 'India Stations'}</div>
+                        <div className="text-sm font-extrabold text-white mt-0.5">{stationsProp.length}</div>
+                      </div>
+                      <div className="glass border-white/[.05] rounded-xl px-3 md:px-4 py-2 text-center">
+                        <div className="text-[10px] text-slate-500 uppercase font-bold">Uptime Avg</div>
+                        <div className="text-sm font-extrabold text-emerald-400 mt-0.5">97.8%</div>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {stationsProp.map(st => {
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {stationsProp.map(st => {
                     const op = OPERATORS.find(o => o.id === st.operator);
                     return (
                       <div key={st.id} className="glass-highlight rounded-2xl p-4 md:p-5 flex flex-col justify-between space-y-4 hover:border-white/10 transition-colors animate-slide-up">
@@ -697,6 +742,7 @@ export default function App() {
                   })}
                 </div>
               </div>
+              )}
             </div>
           )}
 

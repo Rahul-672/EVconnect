@@ -77,6 +77,38 @@ const INITIAL_STATIONS = [
   },
 ];
 
+const generateGlobalStations = (count) => {
+  const fake = [];
+  const operators = ['tata', 'statiq', 'chargezone', 'jiobp'];
+  const prefixes = ['City', 'Highway', 'Central', 'Plaza', 'Express', 'Eco'];
+  for (let i = 0; i < count; i++) {
+    const op = operators[Math.floor(Math.random() * operators.length)];
+    const status = Math.random() > 0.7 ? (Math.random() > 0.5 ? 'occupied' : 'reserved') : 'available';
+    fake.push({
+      id: `GLB-${Math.random().toString(36).substring(2, 9)}`,
+      name: `${op.toUpperCase()} ${prefixes[Math.floor(Math.random()*prefixes.length)]} Hub`,
+      operator: op,
+      lat: 10 + Math.random() * 20, // minLat: 10, maxLat: 30
+      lng: 70 + Math.random() * 20, // minLng: 70, maxLng: 90
+      status: status,
+      connector: 'CCS2',
+      power: [60, 120, 150][Math.floor(Math.random() * 3)],
+      price: 18 + Math.floor(Math.random() * 5),
+      queue: status === 'occupied' ? Math.floor(Math.random() * 3) : 0, 
+      waitMin: status === 'occupied' ? Math.floor(Math.random() * 20) : 0, 
+      uptime: 98 + Math.random() * 2,
+      latency: Math.floor(Math.random() * 50) + 10,
+      temp: 35 + Math.floor(Math.random() * 10),
+      voltage: 400 + Math.floor(Math.random() * 15),
+      current: 50 + Math.floor(Math.random() * 100),
+      faultRisk: Math.floor(Math.random() * 10),
+      forecast: Array.from({length: 10}, () => Math.floor(Math.random() * 40)),
+    });
+  }
+  return fake;
+};
+INITIAL_STATIONS.push(...generateGlobalStations(300));
+
 const mockDB = {
   walletBalance: 1250.00,
   stations: [...INITIAL_STATIONS],
