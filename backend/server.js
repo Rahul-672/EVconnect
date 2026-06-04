@@ -15,6 +15,11 @@ const io = new SocketIOServer(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log(`[HTTP] ${req.method} ${req.url} | Body: ${JSON.stringify(req.body)}`);
+  next();
+});
+
 const PORT = process.env.PORT || 8085;
 
 // Core Stations List (State stored in memory)
@@ -121,6 +126,38 @@ const mockDB = {
   ]
 };
 
+function getOrCreateStation(id) {
+  let station = mockDB.stations.find(s => s.id === id);
+  if (!station && id && (id.startsWith('SIM-') || id.startsWith('DYN-'))) {
+    const operators = ['tata', 'statiq', 'chargezone', 'jiobp'];
+    const op = operators[Math.floor(Math.random() * operators.length)];
+    station = {
+      id: id,
+      name: `${op.toUpperCase()} — Simulated Charger`,
+      operator: op,
+      lat: 26.8504,
+      lng: 80.9422,
+      status: 'available',
+      connector: 'CCS2',
+      power: 120,
+      price: 20.0,
+      queue: 0,
+      waitMin: 0,
+      uptime: 99.1,
+      latency: 45,
+      temp: 32,
+      voltage: 415,
+      current: 0,
+      faultRisk: 5,
+      forecast: [30, 45, 60, 20, 15, 30]
+    };
+    mockDB.stations.push(station);
+    broadcastState();
+  }
+  return station;
+}
+
+
 // 1. MQTT Telemetry Pulse Subscriber (CPO Hardware Link)
 let mqttClient = null;
 try {
@@ -191,7 +228,7 @@ app.get('/api/stations', (req, res) => {
 app.post('/api/stations/:id/start-charge', (req, res) => {
   const { id } = req.params;
   const { isOffline } = req.body;
-  const station = mockDB.stations.find(s => s.id === id);
+  const station = getOrCreateStation(id);
   if (!station) {
     return res.status(404).json({ error: 'Station not found' });
   }
@@ -223,7 +260,7 @@ app.post('/api/stations/:id/start-charge', (req, res) => {
 app.post('/api/stations/:id/stop-charge', (req, res) => {
   const { id } = req.params;
   const { cost, kwh, soc } = req.body;
-  const station = mockDB.stations.find(s => s.id === id);
+  const station = getOrCreateStation(id);
   if (!station) {
     return res.status(404).json({ error: 'Station not found' });
   }
@@ -567,7 +604,7 @@ app.post('/api/wallet/topup', (req, res) => {
 // Charger Slots Reservation
 app.post('/api/reservation', (req, res) => {
   const { stationId } = req.body;
-  const station = mockDB.stations.find(s => s.id === stationId);
+  const station = getOrCreateStation(stationId);
   if (!station) {
     return res.status(404).json({ error: 'Station not found' });
   }
@@ -584,6 +621,24 @@ app.post('/api/reservation', (req, res) => {
   broadcastState();
 
   res.json({ status: 'success', reservation: newReservation });
+});
+
+// Cancel Charger Slots Reservation
+app.post('/api/reservation/cancel', (req, res) => {
+  const { stationId } = req.body;
+  const station = getOrCreateStation(stationId);
+  if (!station) {
+    return res.status(404).json({ error: 'Station not found' });
+  }
+
+  station.status = 'available';
+  station.waitMin = 0;
+
+  // Remove the reservation from mockDB
+  mockDB.reservations = mockDB.reservations.filter(r => r.stationId !== stationId);
+  broadcastState();
+
+  res.json({ status: 'success' });
 });
 
 // AI Predictor Ping Endpoint (relays to Python ai-service)

@@ -180,7 +180,7 @@ const generateFakeStationsAlongRoute = (routeCoords, distanceKm) => {
       const randomName = `${prefixes[Math.floor(Math.random() * prefixes.length)]} ${suffixes[Math.floor(Math.random() * suffixes.length)]} EV Hub (km ${Math.round(totalKmAccumulated)})`;
 
       fakeStations.push({
-        id: `SIM-${Math.random().toString(36).substring(2, 9)}`,
+        id: `SIM-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`,
         name: randomName,
         operator: op,
         lat: routeCoords[i][0],

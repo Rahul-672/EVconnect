@@ -79,9 +79,6 @@ export default function App() {
 
   const indiaStations = stations.filter(isIndiaStation);
 
-  const handleCancelReservation = useCallback((station) => {
-    setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'available', waitMin: 0 } : s));
-  }, []);
 
   const [activeTab, setActiveTab] = useState('map');
   const [selectedStation, setSelectedStation] = useState(null);
@@ -104,7 +101,30 @@ export default function App() {
   const [routeStations, setRouteStations] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLES[0]);
 
-  const stationsProp = routeActive && routeStations.length > 0 ? routeStations : stations;
+  const stationsProp = routeActive && routeStations.length > 0
+    ? routeStations.map(rs => {
+        const latest = stations.find(s => s.id === rs.id);
+        return latest ? { ...rs, status: latest.status, waitMin: latest.waitMin, current: latest.current, voltage: latest.voltage, temp: latest.temp } : rs;
+      })
+    : stations;
+
+  const handleCancelReservation = useCallback(async (station) => {
+    setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'available', waitMin: 0 } : s));
+    setSelectedStation(prev => prev && prev.id === station.id ? { ...prev, status: 'available', waitMin: 0 } : prev);
+    if (!isNetworkOnline) {
+      alert('🕒 Cancelled offline. Sync when connection restores.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8085/api/reservation/cancel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stationId: station.id })
+      });
+      if (!response.ok) throw new Error('Failed to cancel');
+    } catch (error) {
+      console.warn('⚠️ Cancel reservation endpoint offline, fallback to local');
+    }
+  }, [isNetworkOnline]);
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -221,7 +241,7 @@ export default function App() {
   const onReserve = useCallback(async (station) => {
     if (!isNetworkOnline) {
       setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'reserved', waitMin: 30 } : s));
-      setSelectedStation(prev => prev ? { ...prev, status: 'reserved' } : null);
+      setSelectedStation(prev => prev && prev.id === station.id ? { ...prev, status: 'reserved', waitMin: 30 } : prev);
       alert('🕒 Reserved offline. Hold confirmed on-device.');
       return;
     }
@@ -231,11 +251,13 @@ export default function App() {
         body: JSON.stringify({ stationId: station.id })
       });
       if (!response.ok) throw new Error('Failed to reserve');
+      setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'reserved', waitMin: 30 } : s));
+      setSelectedStation(prev => prev && prev.id === station.id ? { ...prev, status: 'reserved', waitMin: 30 } : prev);
       alert(`Slot confirmed at ${station.name}. Hold fee: ₹50 (refundable).`);
     } catch (error) {
       console.warn('⚠️ Reservation endpoint offline, fallback to local');
       setStations(prev => prev.map(s => s.id === station.id ? { ...s, status: 'reserved', waitMin: 30 } : s));
-      setSelectedStation(prev => prev ? { ...prev, status: 'reserved' } : null);
+      setSelectedStation(prev => prev && prev.id === station.id ? { ...prev, status: 'reserved', waitMin: 30 } : prev);
       alert('🕒 Reserved (Offline Mode). Hold confirmed on-device.');
     }
   }, [isNetworkOnline]);
