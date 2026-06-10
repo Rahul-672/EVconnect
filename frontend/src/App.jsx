@@ -698,7 +698,7 @@ export default function App() {
                           </h3>
                         </>
                       ) : (
-                        <h3 className="text-base md:text-lg font-bold text-white">Centralized Charging Hub</h3>
+                        <h3 className="text-base md:text-lg font-bold text-white">Charging Hubs Across India</h3>
                       )}
                       <p className="text-xs text-slate-400 mt-1.5">
                         {routeActive 
