@@ -240,6 +240,11 @@ export default function App() {
         body: JSON.stringify({ cost, kwh, soc, isOffline: false })
       });
       if (!response.ok) throw new Error('API error');
+      
+      const data = await response.json();
+      if (data.walletBalance !== undefined) setBalance(data.walletBalance);
+      if (data.transactions) setTransactions(data.transactions);
+      
       setChargingSession(null);
     } catch (error) {
       console.warn('⚠️ Stop charge endpoint offline, using local simulation fallback');
