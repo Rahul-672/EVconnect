@@ -259,11 +259,7 @@ const mockDB = {
   stations: [...INITIAL_STATIONS],
   sessions: [],
   reservations: [],
-  transactions: [
-    { op: 'Statiq', station: 'Kanpur NH19', kwh: 38.2, cost: 802.20, time: '2 hours ago', type: 'Roaming' },
-    { op: 'Tata Power', station: 'Hazratganj', kwh: 26.4, cost: 488.40, time: 'Yesterday', type: 'Direct' },
-    { op: 'ChargeZone', station: 'Gomti Nagar', kwh: 12.0, cost: 180.00, time: 'Jun 1', type: 'Roaming' },
-  ]
+  transactions: []
 };
 
 function getOrCreateStation(id) {
@@ -413,13 +409,16 @@ app.post('/api/stations/:id/stop-charge', (req, res) => {
 
   // Add transaction
   const opName = station.operator.toUpperCase();
+  const txType = (opName.includes('TATA') || opName.includes('EVCONNECT')) ? 'Direct' : 'Roaming';
+  const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   mockDB.transactions.unshift({
     op: opName,
     station: station.name.split('—')[1]?.trim() || station.name,
     kwh: kwh,
     cost: finalCost,
-    time: 'Just now',
-    type: req.body.isOffline ? 'Offline' : 'Roaming',
+    time: currentTime,
+    type: txType,
+    isOffline: req.body.isOffline || false,
   });
 
   // Clear current active sessions for this station
@@ -740,6 +739,31 @@ app.post('/api/wallet/topup', (req, res) => {
   broadcastState();
   res.json({ status: 'success', balance: mockDB.walletBalance });
 });
+
+app.post('/api/wallet/sync-offline', (req, res) => {
+  const { transactions } = req.body;
+  if (transactions && Array.isArray(transactions)) {
+    transactions.forEach(t => {
+      // Deduct the cost from wallet balance
+      mockDB.walletBalance = Math.round((mockDB.walletBalance - parseFloat(t.cost)) * 100) / 100;
+      
+      // Prepend to transactions as synced
+      const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      mockDB.transactions.unshift({
+        op: t.op,
+        station: t.station,
+        kwh: t.kwh,
+        cost: t.cost,
+        time: t.time || currentTime,
+        type: t.type || 'Roaming',
+        isOffline: true
+      });
+    });
+    broadcastState();
+  }
+  res.json({ status: 'success', balance: mockDB.walletBalance, transactions: mockDB.transactions });
+});
+
 
 // Charger Slots Reservation
 app.post('/api/reservation', (req, res) => {

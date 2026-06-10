@@ -127,7 +127,7 @@ export default function WalletPanel({ balance, onTopUp, transactions = [] }) {
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] md:text-xs font-semibold text-white truncate">{tx.op} — {tx.station}</div>
                 <div className="text-[10px] text-slate-500">
-                  {typeof tx.kwh === 'number' ? tx.kwh.toFixed(1) : tx.kwh} kWh • {tx.type} • {tx.time}
+                  {typeof tx.kwh === 'number' ? tx.kwh.toFixed(1) : tx.kwh} kWh • {tx.type} • {tx.isOffline ? 'Offline' : 'Online'} • {tx.time}
                 </div>
               </div>
               <div className="text-xs md:text-sm font-bold text-white shrink-0">-₹{Math.round(tx.cost)}</div>

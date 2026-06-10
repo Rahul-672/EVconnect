@@ -137,11 +137,7 @@ export default function App() {
     }
   }, [theme]);
 
-  const [transactions, setTransactions] = useState([
-    { op: 'Statiq', station: 'Kanpur NH19', kwh: 38.2, cost: 802.20, time: '2 hours ago', type: 'Roaming' },
-    { op: 'Tata Power', station: 'Hazratganj', kwh: 26.4, cost: 488.40, time: 'Yesterday', type: 'Direct' },
-    { op: 'ChargeZone', station: 'Gomti Nagar', kwh: 12.0, cost: 180.00, time: 'Jun 1', type: 'Roaming' },
-  ]);
+  const [transactions, setTransactions] = useState([]);
 
   const fetchInitialData = useCallback(async () => {
     if (!isNetworkOnline) return;
@@ -165,6 +161,20 @@ export default function App() {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  useEffect(() => {
+    if (isNetworkOnline) {
+      const offlineTx = transactions.filter(t => t.isPendingSync);
+      if (offlineTx.length > 0) {
+        console.log('🔄 Syncing offline transactions to server...');
+        fetch('http://localhost:8085/api/wallet/sync-offline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: offlineTx })
+        }).catch(console.error);
+      }
+    }
+  }, [isNetworkOnline]); // Intentionally omitting transactions to only trigger on network toggle
 
   useEffect(() => {
     if (!isNetworkOnline) return;
@@ -216,7 +226,9 @@ export default function App() {
     if (chargingSession.isOffline || !isNetworkOnline) {
       setBalance(prev => Math.round((prev - finalCost) * 100) / 100);
       const opName = OPERATORS.find(o => o.id === chargingSession.operator)?.name || chargingSession.operator;
-      setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: 'Just now', type: 'Offline' }, ...prev]);
+      const txType = (opName.toLowerCase().includes('tata') || opName.toLowerCase() === 'evconnect') ? 'Direct' : 'Roaming';
+      const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: currentTime, type: txType, isOffline: true, isPendingSync: true }, ...prev]);
       setStations(prev => prev.map(s => s.id === chargingSession.stationId ? { ...s, status: 'available', current: 0 } : s));
       setChargingSession(null);
       alert('⚡ Offline charging session saved on-device. Auto-synchronized when network restores.');
@@ -233,7 +245,9 @@ export default function App() {
       console.warn('⚠️ Stop charge endpoint offline, using local simulation fallback');
       setBalance(prev => Math.round((prev - finalCost) * 100) / 100);
       const opName = OPERATORS.find(o => o.id === chargingSession.operator)?.name || chargingSession.operator;
-      setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: 'Just now', type: 'Offline' }, ...prev]);
+      const txType = (opName.toLowerCase().includes('tata') || opName.toLowerCase() === 'evconnect') ? 'Direct' : 'Roaming';
+      const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: currentTime, type: txType, isOffline: true, isPendingSync: true }, ...prev]);
       setStations(prev => prev.map(s => s.id === chargingSession.stationId ? { ...s, status: 'available', current: 0 } : s));
       setChargingSession(null);
     }
