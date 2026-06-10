@@ -227,7 +227,7 @@ export default function App() {
       setBalance(prev => Math.round((prev - finalCost) * 100) / 100);
       const opName = OPERATORS.find(o => o.id === chargingSession.operator)?.name || chargingSession.operator;
       const txType = (opName.toLowerCase().includes('tata') || opName.toLowerCase() === 'evconnect') ? 'Direct' : 'Roaming';
-      const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      const currentTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
       setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: currentTime, type: txType, isOffline: true, isPendingSync: true }, ...prev]);
       setStations(prev => prev.map(s => s.id === chargingSession.stationId ? { ...s, status: 'available', current: 0 } : s));
       setChargingSession(null);
@@ -251,7 +251,7 @@ export default function App() {
       setBalance(prev => Math.round((prev - finalCost) * 100) / 100);
       const opName = OPERATORS.find(o => o.id === chargingSession.operator)?.name || chargingSession.operator;
       const txType = (opName.toLowerCase().includes('tata') || opName.toLowerCase() === 'evconnect') ? 'Direct' : 'Roaming';
-      const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      const currentTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
       setTransactions(prev => [{ op: opName, station: chargingSession.stationName.split('—')[1]?.trim() || chargingSession.stationName, kwh, cost: finalCost, time: currentTime, type: txType, isOffline: true, isPendingSync: true }, ...prev]);
       setStations(prev => prev.map(s => s.id === chargingSession.stationId ? { ...s, status: 'available', current: 0 } : s));
       setChargingSession(null);

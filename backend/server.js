@@ -414,7 +414,7 @@ app.post('/api/stations/:id/stop-charge', (req, res) => {
   // Add transaction
   const opName = station.operator.toUpperCase();
   const txType = (opName.includes('TATA') || opName.includes('EVCONNECT')) ? 'Direct' : 'Roaming';
-  const currentTime = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  const currentTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   mockDB.transactions.unshift({
     op: opName,
     station: station.name.split('—')[1]?.trim() || station.name,
